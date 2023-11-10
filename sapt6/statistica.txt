@@ -1,0 +1,10 @@
+Nume fisier: .\imagine.bmp
+Dimensiune fisier: 1920
+Inaltime imagine: 1572865
+Lungime imagine: 1280
+Identificatorul utilizatorului: 0
+Contor de legaturi: 1
+Timpul ultimei modificari: Mon Nov  6 16:29:34 2023
+Drepturi de acces user: -rw-
+Drepturi de acces grup: rw-
+Drepturi de acces altii: rw-
