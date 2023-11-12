@@ -108,6 +108,39 @@ void fprintStat(myStat stat, int out) {
     
 }
 
+void fprintDirStat(int out, struct stat fileStat, char *dirName) {
+    char buffer[BUFFER_SIZE];
+
+    sprintf(buffer, "Nume director: %s\n", dirName);
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Indentificatorul utilizatorului: %d\n", fileStat.st_uid);
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Drepturi de acces user: %s%s%s\n", (fileStat.st_mode & S_IRUSR) ? "r" : "-", (fileStat.st_mode & S_IWUSR) ? "w" : "-", (fileStat.st_mode & S_IXUSR) ? "x" : "-");
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Drepturi de acces grup: %s%s%s\n", (fileStat.st_mode & S_IRGRP) ? "r" : "-", (fileStat.st_mode & S_IWGRP) ? "w" : "-", (fileStat.st_mode & S_IXGRP) ? "x" : "-");
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Drepturi de acces altii: %s%s%s\n\n", (fileStat.st_mode & S_IROTH) ? "r" : "-", (fileStat.st_mode & S_IWOTH) ? "w" : "-", (fileStat.st_mode & S_IXOTH) ? "x" : "-");
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+}
+
+void fprintSymLnkStat(int out, struct stat fileStat, char *symLnkName) {
+    char buffer[BUFFER_SIZE];
+
+    sprintf(buffer, "Numele legaturii: %s\n\n", symLnkName);
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+}
+
 int main(int argc, char **argv) {
     struct stat fileStat;
     struct dirent *dirent;
@@ -125,6 +158,12 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    int out = open("statistica.txt", O_WRONLY | O_APPEND);
+    if (out == -1) {
+        printf("Couldn t open output file!\n");
+        exit(1);
+    }
+
     while ((dirent = readdir(dir)) != NULL) {
         char relativePath[50];
         strcpy(relativePath, argv[1]);
@@ -138,10 +177,10 @@ int main(int argc, char **argv) {
         
         if (S_ISREG(fileStat.st_mode)) {
             int in = open(relativePath, O_RDONLY);
-            int out = open("statistica.txt", O_WRONLY | O_APPEND);
+            // int out = open("statistica.txt", O_WRONLY | O_APPEND);
 
-            if (in == -1 || out == -1) {
-                printf("Something went wrong!\n");
+            if (in == -1) {
+                printf("Couldn t open input file!\n");
                 exit(1);
             }
 
@@ -149,9 +188,14 @@ int main(int argc, char **argv) {
             fprintStat(statistic, out);
 
             close(in);
-            close(out);
+        }
+        else if (S_ISDIR(fileStat.st_mode)) {
+            int out = open("statistica.txt", O_WRONLY | O_APPEND);
+
+            fprintDirStat(out, fileStat, dirent->d_name);
         }
 
+        close(out);
     }
 
     closedir(dir);
