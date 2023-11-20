@@ -4,13 +4,15 @@
 #include<dirent.h>
 #include<sys/types.h>
 #include<sys/stat.h>
-#include<string.h>
 #include<unistd.h>
+#include<string.h>
 #include<fcntl.h>
 #include<time.h>
 
 # define BUFFER_SIZE 200 
 # define FIELD_SIZE 100
+# define IS_LNK 0120000
+
 
 typedef struct {
     char numeFisier[FIELD_SIZE], drepturiUser[FIELD_SIZE], drepturiGrup[FIELD_SIZE], drepturiAltii[FIELD_SIZE];
@@ -26,7 +28,7 @@ void getData(int in, myStat *stat, char *numeFisier) {
 
     lseek(in, 18, SEEK_SET);
     read(in, &buffer, 4);
-    stat->dimensiune = buffer;
+    // stat->dimensiune = buffer;
 
     if (strstr(numeFisier, ".bmp")) {
         read(in, &buffer, 4);
@@ -44,6 +46,7 @@ void getData(int in, myStat *stat, char *numeFisier) {
     stat->nrLegaturi = fileStat.st_nlink;
     stat->userId = fileStat.st_uid;
     stat->timpUltimaModificare = fileStat.st_mtime;
+    stat->dimensiune = fileStat.st_size;
 
     (S_ISDIR(fileStat.st_mode)) ? strcpy(stat->drepturiUser, "d") : strcpy(stat->drepturiUser, "-");
     (fileStat.st_mode & S_IRUSR) ? strcat(stat->drepturiUser, "r") : strcat(stat->drepturiUser, "-");
@@ -104,8 +107,6 @@ void fprintStat(myStat stat, int out) {
     sprintf(buffer, "Drepturi de acces altii: %s\n\n", stat.drepturiAltii);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
-
-    
 }
 
 void fprintDirStat(int out, struct stat fileStat, char *dirName) {
@@ -133,10 +134,30 @@ void fprintDirStat(int out, struct stat fileStat, char *dirName) {
 
 }
 
-void fprintSymLnkStat(int out, struct stat fileStat, char *symLnkName) {
+void fprintSymLnkStat(int out, struct stat fileStat, char *dirName, myStat stat, long targetFileDim) {
     char buffer[BUFFER_SIZE];
 
-    sprintf(buffer, "Numele legaturii: %s\n\n", symLnkName);
+    sprintf(buffer, "Nume link simbolic: %s\n", dirName);
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Dimensiune fisier: %ld\n", fileStat.st_size);
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Dimensiune fisier target: %ld\n", targetFileDim);
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Drepturi de acces user: %s%s%s\n", (fileStat.st_mode & S_IRUSR) ? "r" : "-", (fileStat.st_mode & S_IWUSR) ? "w" : "-", (fileStat.st_mode & S_IXUSR) ? "x" : "-");
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Drepturi de acces grup: %s%s%s\n", (fileStat.st_mode & S_IRGRP) ? "r" : "-", (fileStat.st_mode & S_IWGRP) ? "w" : "-", (fileStat.st_mode & S_IXGRP) ? "x" : "-");
+    write(out, buffer, strlen(buffer));
+    strcpy(buffer, "");
+
+    sprintf(buffer, "Drepturi de acces altii: %s%s%s\n\n", (fileStat.st_mode & S_IROTH) ? "r" : "-", (fileStat.st_mode & S_IWOTH) ? "w" : "-", (fileStat.st_mode & S_IXOTH) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 }
@@ -158,31 +179,26 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    int out = open("statistica.txt", O_WRONLY | O_APPEND);
-    if (out == -1) {
-        printf("Couldn t open output file!\n");
-        exit(1);
-    }
-
     while ((dirent = readdir(dir)) != NULL) {
         char relativePath[50];
         strcpy(relativePath, argv[1]);
         strcat(relativePath, "/");
         strcat(relativePath, dirent->d_name);
-        
-        if ((stat(relativePath, &fileStat) == -1)) {
-            printf("Something went wrong!\n");
+
+        if ((lstat(relativePath, &fileStat) == -1)) {
+            printf("Could not get stat for %s!\n", relativePath);
             exit(1);
         }
         
+        int out = open("statistica.txt", O_WRONLY | O_APPEND);
+
+        if (out == -1) {
+            printf("Couldn t open output file\n");
+            exit(1);
+        }
+
         if (S_ISREG(fileStat.st_mode)) {
             int in = open(relativePath, O_RDONLY);
-            // int out = open("statistica.txt", O_WRONLY | O_APPEND);
-
-            if (in == -1) {
-                printf("Couldn t open input file!\n");
-                exit(1);
-            }
 
             getData(in, &statistic, dirent->d_name);
             fprintStat(statistic, out);
@@ -190,9 +206,18 @@ int main(int argc, char **argv) {
             close(in);
         }
         else if (S_ISDIR(fileStat.st_mode)) {
-            int out = open("statistica.txt", O_WRONLY | O_APPEND);
-
             fprintDirStat(out, fileStat, dirent->d_name);
+
+        }
+        else if (S_ISLNK(fileStat.st_mode)) {
+            struct stat statForTargetFile;
+
+            if ((stat(relativePath, &statForTargetFile) == -1)) {
+                printf("Could not get stat for %s!\n", relativePath);
+                exit(1);
+            }
+
+            fprintSymLnkStat(out, fileStat, dirent->d_name, statistic, statForTargetFile.st_size);
         }
 
         close(out);
