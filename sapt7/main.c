@@ -11,7 +11,6 @@
 
 # define BUFFER_SIZE 200 
 # define FIELD_SIZE 100
-# define IS_LNK 0120000
 
 
 typedef struct {
@@ -28,7 +27,6 @@ void getData(int in, myStat *stat, char *numeFisier) {
 
     lseek(in, 18, SEEK_SET);
     read(in, &buffer, 4);
-    // stat->dimensiune = buffer;
 
     if (strstr(numeFisier, ".bmp")) {
         read(in, &buffer, 4);
