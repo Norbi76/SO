@@ -160,7 +160,7 @@ void fprintSymLnkStat(int out, struct stat *fileStat, char *dirName, myStat stat
     strcpy(buffer, "");
 }
 
-void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *fileStat, myStat *statistic) {
+void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *fileStat, myStat *statistic, int *out) {
     while ((dirent = readdir(dir)) != NULL) {
         char relativePath[50];
         strcpy(relativePath, parsedFolder);
@@ -171,24 +171,17 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
             printf("Could not get stat for %s!\n", relativePath);
             exit(1);
         }
-        
-        int out = open("statistica.txt", O_WRONLY | O_APPEND);
-
-        if (out == -1) {
-            printf("Couldn t open output file\n");
-            exit(1);
-        }
 
         if (S_ISREG(fileStat->st_mode)) {
             int in = open(relativePath, O_RDONLY);
 
             getData(in, statistic, dirent->d_name);
-            fprintStat(statistic, out);
+            fprintStat(statistic, *out);
 
             close(in);
         }
         else if (S_ISDIR(fileStat->st_mode)) {
-            fprintDirStat(out, fileStat, dirent->d_name);
+            fprintDirStat(*out, fileStat, dirent->d_name);
 
         }
         else if (S_ISLNK(fileStat->st_mode)) {
@@ -199,17 +192,16 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
                 exit(1);
             }
 
-            fprintSymLnkStat(out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
+            fprintSymLnkStat(*out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
         }
 
-        close(out);
     }
 }
 
 int main(int argc, char **argv) {
     struct stat fileStat;
-    struct dirent *dirent = NULL;
     myStat statistic;
+    struct dirent *dirent = NULL;
     DIR *dir = NULL;
 
     if (argc != 2) {
@@ -223,8 +215,15 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    parseDir(dir, dirent, argv[1], &fileStat, &statistic);
+    int out = open("statistica.txt", O_WRONLY | O_TRUNC);
+    if (out == -1) {
+        printf("Couldn t open output file\n");
+        exit(1);
+    }
 
+    parseDir(dir, dirent, argv[1], &fileStat, &statistic, &out);
+    
+    close(out);
     closedir(dir);
 
     return 0;
