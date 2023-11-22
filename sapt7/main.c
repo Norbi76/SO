@@ -61,85 +61,85 @@ void getData(int in, myStat *stat, char *numeFisier) {
 
 }
 
-void fprintStat(myStat stat, int out) {
+void fprintStat(myStat *stat, int out) {
     char buffer[BUFFER_SIZE];
 
-    sprintf(buffer, "Nume fisier: %s\n", stat.numeFisier);
+    sprintf(buffer, "Nume fisier: %s\n", stat->numeFisier);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Dimensiune fisier: %d\n", stat.dimensiune);
+    sprintf(buffer, "Dimensiune fisier: %d\n", stat->dimensiune);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    if (stat.inaltime != -1 || stat.lungime != -1) {
-        sprintf(buffer, "Inaltime imagine: %d\n", stat.inaltime);
+    if (stat->inaltime != -1 || stat->lungime != -1) {
+        sprintf(buffer, "Inaltime imagine: %d\n", stat->inaltime);
         write(out, buffer, strlen(buffer));
         strcpy(buffer, "");
 
-        sprintf(buffer, "Lungime imagine: %d\n", stat.lungime);
+        sprintf(buffer, "Lungime imagine: %d\n", stat->lungime);
         write(out, buffer, strlen(buffer));
         strcpy(buffer, "");
     }
 
-    sprintf(buffer, "Identificatorul utilizatorului: %d\n", stat.userId);
+    sprintf(buffer, "Identificatorul utilizatorului: %d\n", stat->userId);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Contor de legaturi: %d\n", stat.nrLegaturi);
+    sprintf(buffer, "Contor de legaturi: %d\n", stat->nrLegaturi);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Timpul ultimei modificari: %s", ctime(&stat.timpUltimaModificare));
+    sprintf(buffer, "Timpul ultimei modificari: %s", ctime(&stat->timpUltimaModificare));
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces user: %s\n", stat.drepturiUser);
+    sprintf(buffer, "Drepturi de acces user: %s\n", stat->drepturiUser);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces grup: %s\n", stat.drepturiGrup);
+    sprintf(buffer, "Drepturi de acces grup: %s\n", stat->drepturiGrup);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces altii: %s\n\n", stat.drepturiAltii);
+    sprintf(buffer, "Drepturi de acces altii: %s\n\n", stat->drepturiAltii);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 }
 
-void fprintDirStat(int out, struct stat fileStat, char *dirName) {
+void fprintDirStat(int out, struct stat *fileStat, char *dirName) {
     char buffer[BUFFER_SIZE];
 
     sprintf(buffer, "Nume director: %s\n", dirName);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Indentificatorul utilizatorului: %d\n", fileStat.st_uid);
+    sprintf(buffer, "Indentificatorul utilizatorului: %d\n", fileStat->st_uid);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces user: %s%s%s\n", (fileStat.st_mode & S_IRUSR) ? "r" : "-", (fileStat.st_mode & S_IWUSR) ? "w" : "-", (fileStat.st_mode & S_IXUSR) ? "x" : "-");
+    sprintf(buffer, "Drepturi de acces user: %s%s%s\n", (fileStat->st_mode & S_IRUSR) ? "r" : "-", (fileStat->st_mode & S_IWUSR) ? "w" : "-", (fileStat->st_mode & S_IXUSR) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces grup: %s%s%s\n", (fileStat.st_mode & S_IRGRP) ? "r" : "-", (fileStat.st_mode & S_IWGRP) ? "w" : "-", (fileStat.st_mode & S_IXGRP) ? "x" : "-");
+    sprintf(buffer, "Drepturi de acces grup: %s%s%s\n", (fileStat->st_mode & S_IRGRP) ? "r" : "-", (fileStat->st_mode & S_IWGRP) ? "w" : "-", (fileStat->st_mode & S_IXGRP) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces altii: %s%s%s\n\n", (fileStat.st_mode & S_IROTH) ? "r" : "-", (fileStat.st_mode & S_IWOTH) ? "w" : "-", (fileStat.st_mode & S_IXOTH) ? "x" : "-");
+    sprintf(buffer, "Drepturi de acces altii: %s%s%s\n\n", (fileStat->st_mode & S_IROTH) ? "r" : "-", (fileStat->st_mode & S_IWOTH) ? "w" : "-", (fileStat->st_mode & S_IXOTH) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
 }
 
-void fprintSymLnkStat(int out, struct stat fileStat, char *dirName, myStat stat, long targetFileDim) {
+void fprintSymLnkStat(int out, struct stat *fileStat, char *dirName, myStat stat, long targetFileDim) {
     char buffer[BUFFER_SIZE];
 
     sprintf(buffer, "Nume link simbolic: %s\n", dirName);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Dimensiune fisier: %ld\n", fileStat.st_size);
+    sprintf(buffer, "Dimensiune fisier: %ld\n", fileStat->st_size);
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
@@ -147,24 +147,70 @@ void fprintSymLnkStat(int out, struct stat fileStat, char *dirName, myStat stat,
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces user: %s%s%s\n", (fileStat.st_mode & S_IRUSR) ? "r" : "-", (fileStat.st_mode & S_IWUSR) ? "w" : "-", (fileStat.st_mode & S_IXUSR) ? "x" : "-");
+    sprintf(buffer, "Drepturi de acces user: %s%s%s\n", (fileStat->st_mode & S_IRUSR) ? "r" : "-", (fileStat->st_mode & S_IWUSR) ? "w" : "-", (fileStat->st_mode & S_IXUSR) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces grup: %s%s%s\n", (fileStat.st_mode & S_IRGRP) ? "r" : "-", (fileStat.st_mode & S_IWGRP) ? "w" : "-", (fileStat.st_mode & S_IXGRP) ? "x" : "-");
+    sprintf(buffer, "Drepturi de acces grup: %s%s%s\n", (fileStat->st_mode & S_IRGRP) ? "r" : "-", (fileStat->st_mode & S_IWGRP) ? "w" : "-", (fileStat->st_mode & S_IXGRP) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 
-    sprintf(buffer, "Drepturi de acces altii: %s%s%s\n\n", (fileStat.st_mode & S_IROTH) ? "r" : "-", (fileStat.st_mode & S_IWOTH) ? "w" : "-", (fileStat.st_mode & S_IXOTH) ? "x" : "-");
+    sprintf(buffer, "Drepturi de acces altii: %s%s%s\n\n", (fileStat->st_mode & S_IROTH) ? "r" : "-", (fileStat->st_mode & S_IWOTH) ? "w" : "-", (fileStat->st_mode & S_IXOTH) ? "x" : "-");
     write(out, buffer, strlen(buffer));
     strcpy(buffer, "");
 }
 
+void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *fileStat, myStat *statistic) {
+    while ((dirent = readdir(dir)) != NULL) {
+        char relativePath[50];
+        strcpy(relativePath, parsedFolder);
+        strcat(relativePath, "/");
+        strcat(relativePath, dirent->d_name);
+
+        if ((lstat(relativePath, fileStat) == -1)) {
+            printf("Could not get stat for %s!\n", relativePath);
+            exit(1);
+        }
+        
+        int out = open("statistica.txt", O_WRONLY | O_APPEND);
+
+        if (out == -1) {
+            printf("Couldn t open output file\n");
+            exit(1);
+        }
+
+        if (S_ISREG(fileStat->st_mode)) {
+            int in = open(relativePath, O_RDONLY);
+
+            getData(in, statistic, dirent->d_name);
+            fprintStat(statistic, out);
+
+            close(in);
+        }
+        else if (S_ISDIR(fileStat->st_mode)) {
+            fprintDirStat(out, fileStat, dirent->d_name);
+
+        }
+        else if (S_ISLNK(fileStat->st_mode)) {
+            struct stat statForTargetFile;
+
+            if ((stat(relativePath, &statForTargetFile) == -1)) {
+                printf("Could not get stat for %s!\n", relativePath);
+                exit(1);
+            }
+
+            fprintSymLnkStat(out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
+        }
+
+        close(out);
+    }
+}
+
 int main(int argc, char **argv) {
     struct stat fileStat;
-    struct dirent *dirent;
+    struct dirent *dirent = NULL;
     myStat statistic;
-    DIR *dir;
+    DIR *dir = NULL;
 
     if (argc != 2) {
         printf("Usage ./program <director intrare>\n");
@@ -177,49 +223,7 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    while ((dirent = readdir(dir)) != NULL) {
-        char relativePath[50];
-        strcpy(relativePath, argv[1]);
-        strcat(relativePath, "/");
-        strcat(relativePath, dirent->d_name);
-
-        if ((lstat(relativePath, &fileStat) == -1)) {
-            printf("Could not get stat for %s!\n", relativePath);
-            exit(1);
-        }
-        
-        int out = open("statistica.txt", O_WRONLY | O_APPEND);
-
-        if (out == -1) {
-            printf("Couldn t open output file\n");
-            exit(1);
-        }
-
-        if (S_ISREG(fileStat.st_mode)) {
-            int in = open(relativePath, O_RDONLY);
-
-            getData(in, &statistic, dirent->d_name);
-            fprintStat(statistic, out);
-
-            close(in);
-        }
-        else if (S_ISDIR(fileStat.st_mode)) {
-            fprintDirStat(out, fileStat, dirent->d_name);
-
-        }
-        else if (S_ISLNK(fileStat.st_mode)) {
-            struct stat statForTargetFile;
-
-            if ((stat(relativePath, &statForTargetFile) == -1)) {
-                printf("Could not get stat for %s!\n", relativePath);
-                exit(1);
-            }
-
-            fprintSymLnkStat(out, fileStat, dirent->d_name, statistic, statForTargetFile.st_size);
-        }
-
-        close(out);
-    }
+    parseDir(dir, dirent, argv[1], &fileStat, &statistic);
 
     closedir(dir);
 
