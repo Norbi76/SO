@@ -202,16 +202,31 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
             exit(1);
         }
 
+        pid_t pid;
         if (S_ISREG(fileStat->st_mode)) {
             int in = open(relativePath, O_RDONLY);
-
             getData(in, statistic, dirent->d_name);
-            fprintStat(statistic, out);
+
+            if ((pid = fork()) < 0) {
+                printf("error\n");
+                exit(1);
+            }
+            else if (pid == 0) {
+                fprintStat(statistic, out);
+                exit(0);
+            }
 
             close(in);
         }
         else if (S_ISDIR(fileStat->st_mode)) {
-            fprintDirStat(out, fileStat, dirent->d_name);
+            if ((pid = fork()) < 0) {
+                printf("error\n");
+                exit(1);
+            }
+            else if (pid == 0) {
+                fprintDirStat(out, fileStat, dirent->d_name);
+                exit(0);
+            }
 
         }
         else if (S_ISLNK(fileStat->st_mode)) {
@@ -222,7 +237,15 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
                 continue;
             }
 
-            fprintSymLnkStat(out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
+            if ((pid = fork()) < 0) {
+                printf("error\n");
+                exit(1);
+            }
+            else if (pid == 0) {
+                fprintSymLnkStat(out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
+                exit(0);
+            }
+
         }
 
         close(out);
