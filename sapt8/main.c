@@ -159,7 +159,7 @@ void fprintSymLnkStat(int out, struct stat *fileStat, char *dirName, myStat stat
     strcpy(buffer, "");
 }
 
-void createStatisticFilePath(char *entName, char *outputRelativePath) {
+void createDirEntityFilePath(char *entName, char *outputRelativePath) {
     char fileName[BUFFER_SIZE];
 
     if (strcmp(entName, ".") == 0) {
@@ -178,10 +178,44 @@ void createStatisticFilePath(char *entName, char *outputRelativePath) {
         }
 
         strcpy(outputRelativePath, "output_dir/");
+        //FIXME change the string copied to outputRelativePath to argv[2]
         strcat(outputRelativePath, fileName);
 }
 
-void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *fileStat, myStat *statistic) {
+void recordWrittenLines(int out, int writtenLines, char *fileName) {
+    char buffer[BUFFER_SIZE];
+    sprintf(buffer, "S au scris %d linii in %s.\n", writtenLines, fileName);
+    write(out, buffer, strlen(buffer));
+}
+
+int countLinesInFile(char *filePath) {
+    FILE *in;
+    if((in = fopen(filePath, "r")) == NULL) {
+        printf("Counting lines in %s failed!\n", filePath);
+        exit(1);
+    }
+    int lines = 0;
+
+    char buffer[BUFFER_SIZE];
+    while(fgets(buffer, BUFFER_SIZE, in) != NULL) {
+        lines++;
+    }
+    
+    return lines - 1;
+}
+
+void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputFolder, struct stat *fileStat, myStat *statistic) {
+    char statisticFilePath[BUFFER_SIZE];
+    strcpy(statisticFilePath, outputFolder);
+    strcat(statisticFilePath, "/");
+    strcat(statisticFilePath, "statistic.txt");
+
+    int statisticFile = open(statisticFilePath, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR);
+    if (statisticFile == -1) {
+        printf("Couldn't open output file!\n");
+        exit(1);
+    }
+    
     while ((dirent = readdir(dir)) != NULL) {
         char relativePath[50];
         strcpy(relativePath, parsedFolder);
@@ -194,7 +228,7 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
         }
         
         char outputRelPath[BUFFER_SIZE];
-        createStatisticFilePath(dirent->d_name, outputRelPath);
+        createDirEntityFilePath(dirent->d_name, outputRelPath);
 
         int out = open(outputRelPath, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR);
         if (out == -1) {
@@ -202,6 +236,13 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
             exit(1);
         }
 
+        int pfd[2];
+        if (pipe(pfd) < 0) {
+            printf("Error creating pipe!\n");
+            exit(1);
+        }
+
+        int writtenLines, buffer;
         pid_t pid;
         if (S_ISREG(fileStat->st_mode)) {
             int in = open(relativePath, O_RDONLY);
@@ -213,8 +254,23 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
             }
             else if (pid == 0) {
                 fprintStat(statistic, out);
+                close(out);
+
+                // printf("%d\n", countLinesInFile(outputRelPath));
+                buffer = countLinesInFile(outputRelPath);
+                close(pfd[0]);
+                write(pfd[1], &buffer, sizeof(int));
+                close(pfd[1]);
+                
                 exit(0);
             }
+            
+            close(pfd[1]);
+            read(pfd[0], &writtenLines, sizeof(int));
+            close(pfd[0]);
+
+            // printf("%s %d\n", relativePath, writtenLines);
+            recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
             close(in);
         }
@@ -225,8 +281,21 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
             }
             else if (pid == 0) {
                 fprintDirStat(out, fileStat, dirent->d_name);
+                close(out);
+                
+                buffer = countLinesInFile(outputRelPath);
+                close(pfd[0]);
+                write(pfd[1], &buffer, sizeof(int));
+                close(pfd[1]);
+
                 exit(0);
             }
+
+            close(pfd[1]);
+            read(pfd[0], &writtenLines, sizeof(int));
+            close(pfd[0]);
+
+            recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
         }
         else if (S_ISLNK(fileStat->st_mode)) {
@@ -243,23 +312,35 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, struct stat *
             }
             else if (pid == 0) {
                 fprintSymLnkStat(out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
+                close(out);
+
+                // printf("%d\n", countLinesInFile(outputRelPath));
+                buffer = countLinesInFile(outputRelPath);
+                close(pfd[0]);
+                write(pfd[1], &buffer, sizeof(int));
+                close(pfd[1]);
+
                 exit(0);
             }
 
-        }
+            close(pfd[1]);
+            read(pfd[0], &writtenLines, sizeof(int));
+            close(pfd[0]);
 
-        close(out);
+            recordWrittenLines(statisticFile, writtenLines, outputRelPath);
+        }
     }
+    close(statisticFile);
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        printf("Usage ./a.out <director_intrare> <director_iesire>\n");
-        exit(1);
-    }
+    // if (argc != 3) {
+    //     printf("Usage ./a.out <director_intrare> <director_iesire>\n");
+    //     exit(1);
+    // }
 
     struct dirent *dirent = NULL;
-    DIR *dir = opendir(argv[1]);
+    DIR *dir = opendir("input_dir");
 
     if (dir == NULL) {
         printf("Can t open directory!\n");
@@ -269,37 +350,9 @@ int main(int argc, char **argv) {
     struct stat fileStat;
     myStat statistic;
 
-    parseDir(dir, dirent, argv[1], &fileStat, &statistic);
+    parseDir(dir, dirent, "input_dir", "output_dir", &fileStat, &statistic);
 
-    // int n1 = fork(); 
-  
-    // // Creating second child. First child 
-    // // also executes this line and creates 
-    // // grandchild. 
-    // int n2 = fork(); 
-  
-    // if (n1 > 0 && n2 > 0) { 
-    //     printf("parent\n"); 
-    //     printf("%d %d \n", n1, n2); 
-    //     printf(" my id is %d \n", getpid()); 
-    // } 
-    // else if (n1 == 0 && n2 > 0) 
-    // { 
-    //     printf("First child\n"); 
-    //     printf("%d %d \n", n1, n2); 
-    //     printf("my id is %d  \n", getpid()); 
-    // } 
-    // else if (n1 > 0 && n2 == 0) 
-    // { 
-    //     printf("Second child\n"); 
-    //     printf("%d %d \n", n1, n2); 
-    //     printf("my id is %d  \n", getpid()); 
-    // } 
-    // else { 
-    //     printf("third child\n"); 
-    //     printf("%d %d \n", n1, n2); 
-    //     printf(" my id is %d \n", getpid()); 
-    // } 
+    closedir(dir);
 
     return 0;
 }
