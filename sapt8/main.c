@@ -8,9 +8,13 @@
 #include<string.h>
 #include<fcntl.h>
 #include<time.h>
+#include<sys/types.h>
+#include<sys/wait.h>
 
 # define BUFFER_SIZE 200 
 # define FIELD_SIZE 100
+
+# define RASTER_DATA_OFFSET 10
 
 typedef struct {
     char numeFisier[FIELD_SIZE], drepturiUser[FIELD_SIZE], drepturiGrup[FIELD_SIZE], drepturiAltii[FIELD_SIZE];
@@ -160,7 +164,7 @@ void fprintSymLnkStat(int out, struct stat *fileStat, char *dirName, myStat stat
     strcpy(buffer, "");
 }
 
-void createDirEntityFilePath(char *entName, char *outputRelativePath) {
+void createDirEntityFilePath(char *entName, char *outputRelativePath, char *outputDir) {
     char fileName[BUFFER_SIZE];
 
     if (strcmp(entName, ".") == 0) {
@@ -178,7 +182,7 @@ void createDirEntityFilePath(char *entName, char *outputRelativePath) {
             strcat(fileName, "_statistic.txt");
         }
 
-        strcpy(outputRelativePath, "output_dir/");
+        strcpy(outputRelativePath, outputDir);
         strcat(outputRelativePath, fileName);
 }
 
@@ -207,7 +211,7 @@ int countLinesInFile(char *filePath) {
 int getRasterDataStartAddress(int bmpIn) {
     int rasterDataOff;
 
-    lseek(bmpIn, 10, SEEK_SET);
+    lseek(bmpIn, RASTER_DATA_OFFSET, SEEK_SET);
     read(bmpIn, &rasterDataOff, 4);
 
     // printf("%d\n", rasterDataOff);
@@ -260,7 +264,7 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
         }
         
         char outputRelPath[BUFFER_SIZE];
-        createDirEntityFilePath(dirent->d_name, outputRelPath);
+        createDirEntityFilePath(dirent->d_name, outputRelPath, outputFolder);
 
         int out = open(outputRelPath, O_WRONLY | O_CREAT | O_TRUNC, S_IWUSR);
         if (out == -1) {
@@ -276,6 +280,7 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
 
         int writtenLines, buffer;
         pid_t pid;
+        int returnCode;
         if (S_ISREG(fileStat->st_mode)) {
             int in = open(relativePath, O_RDWR);
             getData(in, statistic, dirent->d_name);
@@ -286,6 +291,7 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
             }
             else if (pid == 0) {
                 pid_t toBlackAndWhitePid;
+                int returnCode;
                 fprintStat(statistic, out);
                 close(out);
 
@@ -306,6 +312,8 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                     }
                 }
 
+                wait(&returnCode);
+                printf("S a incheiat procesul cu PID ul %d cu codul %d!\n", toBlackAndWhitePid, returnCode);
                 
                 exit(0);
             }
@@ -315,6 +323,9 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
             close(pfd[0]);
 
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
+
+            wait(&returnCode);
+            printf("S a incheiat procesul cu PID ul %d cu codul %d!\n", pid, returnCode);
 
             close(in);
         }
@@ -341,6 +352,8 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
 
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
+            wait(&returnCode);
+            printf("S a incheiat procesul cu PID ul %d cu codul %d!\n", pid, returnCode);
         }
         else if (S_ISLNK(fileStat->st_mode)) {
             struct stat statForTargetFile;
@@ -371,16 +384,19 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
             close(pfd[0]);
 
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
+
+            wait(&returnCode);
+            printf("S a incheiat procesul cu PID ul %d cu codul %d!\n", pid, returnCode);
         }
     }
     close(statisticFile);
 }
 
 int main(int argc, char **argv) {
-    // if (argc != 3) {
-    //     printf("Usage ./a.out <director_intrare> <director_iesire>\n");
-    //     exit(1);
-    // }
+    if (argc != 3) {
+        printf("Usage ./a.out <director_intrare> <director_iesire>\n");
+        exit(1);
+    }
 
     struct dirent *dirent = NULL;
     DIR *dir = opendir("input_dir");
@@ -393,7 +409,7 @@ int main(int argc, char **argv) {
     struct stat fileStat;
     myStat statistic;
 
-    parseDir(dir, dirent, "input_dir", "output_dir", &fileStat, &statistic);
+    parseDir(dir, dirent, argv[1], argv[2], &fileStat, &statistic);
 
     closedir(dir);
 
