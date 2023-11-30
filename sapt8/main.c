@@ -25,7 +25,8 @@ void getData(int in, myStat *stat, char *numeFisier) {
     strcpy(stat->numeFisier, numeFisier);
 
     lseek(in, 18, SEEK_SET);
-    read(in, &buffer, 4);
+    // read(in, &buffer, 4);
+
 
     if (strstr(numeFisier, ".bmp")) {
         read(in, &buffer, 4);
@@ -178,7 +179,6 @@ void createDirEntityFilePath(char *entName, char *outputRelativePath) {
         }
 
         strcpy(outputRelativePath, "output_dir/");
-        //FIXME change the string copied to outputRelativePath to argv[2]
         strcat(outputRelativePath, fileName);
 }
 
@@ -202,6 +202,38 @@ int countLinesInFile(char *filePath) {
     }
     
     return lines - 1;
+}
+
+int getRasterDataStartAddress(int bmpIn) {
+    int rasterDataOff;
+
+    lseek(bmpIn, 10, SEEK_SET);
+    read(bmpIn, &rasterDataOff, 4);
+
+    // printf("%d\n", rasterDataOff);
+
+    return rasterDataOff;
+}
+
+void toBlackAndWhite(int bmpIn, int width, int heigth) {
+    unsigned char bluePixel, greenPixel, redPixel;
+    
+    int rasterStart = getRasterDataStartAddress(bmpIn);
+    lseek(bmpIn, rasterStart, SEEK_SET);
+
+    for (int i = 0; i < (width * heigth); i++){
+        read(bmpIn, &bluePixel, 1) ? : printf("error\n");
+        read(bmpIn, &greenPixel, 1) ? : printf("error\n");
+        read(bmpIn, &redPixel, 1) ? : printf("error\n");
+
+        unsigned char greyValue = 0.114 * bluePixel + 0.587 * greenPixel + 0.299 * redPixel;
+
+        lseek(bmpIn, -3, SEEK_CUR);
+
+        write(bmpIn, &greyValue, 1) ? : printf("error\n");
+        write(bmpIn, &greyValue, 1) ? : printf("error\n");
+        write(bmpIn, &greyValue, 1) ? : printf("error\n");
+    }
 }
 
 void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputFolder, struct stat *fileStat, myStat *statistic) {
@@ -245,7 +277,7 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
         int writtenLines, buffer;
         pid_t pid;
         if (S_ISREG(fileStat->st_mode)) {
-            int in = open(relativePath, O_RDONLY);
+            int in = open(relativePath, O_RDWR);
             getData(in, statistic, dirent->d_name);
 
             if ((pid = fork()) < 0) {
@@ -253,14 +285,27 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                 exit(1);
             }
             else if (pid == 0) {
+                pid_t toBlackAndWhitePid;
                 fprintStat(statistic, out);
                 close(out);
 
-                // printf("%d\n", countLinesInFile(outputRelPath));
                 buffer = countLinesInFile(outputRelPath);
                 close(pfd[0]);
                 write(pfd[1], &buffer, sizeof(int));
                 close(pfd[1]);
+
+                if (strstr(relativePath, ".bmp")) {
+                    if ((toBlackAndWhitePid = fork()) < 0) {
+                        printf("Can't create process!\n");
+                        exit(1);
+                    }
+                    else if (toBlackAndWhitePid == 0) {
+                        toBlackAndWhite(in, statistic->lungime, statistic->inaltime);
+
+                        exit(0);
+                    }
+                }
+
                 
                 exit(0);
             }
@@ -269,7 +314,6 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
             read(pfd[0], &writtenLines, sizeof(int));
             close(pfd[0]);
 
-            // printf("%s %d\n", relativePath, writtenLines);
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
             close(in);
@@ -314,7 +358,6 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                 fprintSymLnkStat(out, fileStat, dirent->d_name, *statistic, statForTargetFile.st_size);
                 close(out);
 
-                // printf("%d\n", countLinesInFile(outputRelPath));
                 buffer = countLinesInFile(outputRelPath);
                 close(pfd[0]);
                 write(pfd[1], &buffer, sizeof(int));
