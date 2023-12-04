@@ -214,8 +214,6 @@ int getRasterDataStartAddress(int bmpIn) {
     lseek(bmpIn, RASTER_DATA_OFFSET, SEEK_SET);
     read(bmpIn, &rasterDataOff, 4);
 
-    // printf("%d\n", rasterDataOff);
-
     return rasterDataOff;
 }
 
