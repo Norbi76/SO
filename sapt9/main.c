@@ -240,7 +240,7 @@ void toBlackAndWhite(int bmpIn, int width, int heigth) {
     }
 }
 
-void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputFolder, struct stat *fileStat, myStat *statistic) {
+void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputFolder, char *alfanumericChar, struct stat *fileStat, myStat *statistic) {
     char statisticFilePath[BUFFER_SIZE];
     strcpy(statisticFilePath, outputFolder);
     strcat(statisticFilePath, "/");
@@ -252,6 +252,7 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
         exit(1);
     }
     
+    int correctSentences = 0;
     while ((dirent = readdir(dir)) != NULL) {
         char relativePath[50];
         strcpy(relativePath, parsedFolder);
@@ -272,15 +273,14 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
             exit(1);
         }
 
-        int pfd[2];
-        if (pipe(pfd) < 0) {
+        int writtenLinesPipe[2], regFileContentPipe[2], corectSentencesPipe[2];
+        if (pipe(writtenLinesPipe) < 0 || pipe(regFileContentPipe) < 0 || pipe(corectSentencesPipe) < 0) {
             printf("Error creating pipe!\n");
             exit(1);
         }
 
-        int writtenLines, buffer;
+        int writtenLines, buffer, returnCode;
         pid_t pid;
-        int returnCode;
         if (S_ISREG(fileStat->st_mode)) {
             int in = open(relativePath, O_RDWR);
             getData(in, statistic, dirent->d_name);
@@ -296,9 +296,9 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                 close(out);
 
                 buffer = countLinesInFile(outputRelPath);
-                close(pfd[0]);
-                write(pfd[1], &buffer, sizeof(int));
-                close(pfd[1]);
+                close(writtenLinesPipe[0]);
+                write(writtenLinesPipe[1], &buffer, sizeof(int));
+                close(writtenLinesPipe[1]);
 
                 if (strstr(relativePath, ".bmp")) {
                     if ((toBlackAndWhitePid = fork()) < 0) {
@@ -315,13 +315,55 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                 wait(&returnCode);
                 printf("S a incheiat procesul cu PID ul %d cu codul %d!\n", toBlackAndWhitePid, returnCode);
                 
-                exit(0);
+                close(regFileContentPipe[0]);
+                if (dup2(regFileContentPipe[1], STDOUT_FILENO) < 0) { 
+                    printf("Error redirecting stdout!\n");
+                    exit(1);
+                }
+                execlp("cat", "cat", relativePath, NULL);
+                
+
+                exit(1);
+            }
+
+            if ((pid = fork()) < 0) {
+                printf("error\n");
+                exit(1);
+            }
+            else if (pid == 0) {
+                close(regFileContentPipe[1]);
+                if (dup2(regFileContentPipe[0], STDIN_FILENO) < 0) {
+                    printf("Error redirecting stdin!\n");
+                    exit(1);
+                }
+
+                close(corectSentencesPipe[0]);
+                if (dup2(corectSentencesPipe[1], STDOUT_FILENO) < 0) {
+                    printf("Error redirecting stdin!\n");
+                    exit(1);
+                }
+
+                execl("./main.sh", "./main.sh", alfanumericChar, NULL);
+
+                exit(1);
             }
             
-            close(pfd[1]);
-            read(pfd[0], &writtenLines, sizeof(int));
-            close(pfd[0]);
+            close(writtenLinesPipe[1]);
+            read(writtenLinesPipe[0], &writtenLines, sizeof(int));
+            close(writtenLinesPipe[0]);
+            
+            close(regFileContentPipe[0]);
+            close(regFileContentPipe[1]);
 
+            close(corectSentencesPipe[1]);
+
+            char corectSentencesCountBuffer[16];
+            if (read(corectSentencesPipe[0], corectSentencesCountBuffer, sizeof(corectSentencesCountBuffer)) < 0) {
+                printf("Error reading from pipe!\n");
+                exit(1);
+            }
+
+            correctSentences += atoi(corectSentencesCountBuffer);
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
             wait(&returnCode);
@@ -339,16 +381,16 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                 close(out);
                 
                 buffer = countLinesInFile(outputRelPath);
-                close(pfd[0]);
-                write(pfd[1], &buffer, sizeof(int));
-                close(pfd[1]);
+                close(writtenLinesPipe[0]);
+                write(writtenLinesPipe[1], &buffer, sizeof(int));
+                close(writtenLinesPipe[1]);
 
                 exit(0);
             }
 
-            close(pfd[1]);
-            read(pfd[0], &writtenLines, sizeof(int));
-            close(pfd[0]);
+            close(writtenLinesPipe[1]);
+            read(writtenLinesPipe[0], &writtenLines, sizeof(int));
+            close(writtenLinesPipe[0]);
 
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
@@ -372,16 +414,16 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
                 close(out);
 
                 buffer = countLinesInFile(outputRelPath);
-                close(pfd[0]);
-                write(pfd[1], &buffer, sizeof(int));
-                close(pfd[1]);
+                close(writtenLinesPipe[0]);
+                write(writtenLinesPipe[1], &buffer, sizeof(int));
+                close(writtenLinesPipe[1]);
 
                 exit(0);
             }
 
-            close(pfd[1]);
-            read(pfd[0], &writtenLines, sizeof(int));
-            close(pfd[0]);
+            close(writtenLinesPipe[1]);
+            read(writtenLinesPipe[0], &writtenLines, sizeof(int));
+            close(writtenLinesPipe[0]);
 
             recordWrittenLines(statisticFile, writtenLines, outputRelPath);
 
@@ -389,12 +431,15 @@ void parseDir(DIR *dir, struct dirent *dirent, char *parsedFolder, char *outputF
             printf("S a incheiat procesul cu PID ul %d cu codul %d!\n", pid, returnCode);
         }
     }
+
+    printf("Au fost identificate in total %d propozitii corecte care contin caracterul %s!\n", correctSentences, alfanumericChar);
+
     close(statisticFile);
 }
 
 int main(int argc, char **argv) {
-    if (argc != 3) {
-        printf("Usage ./a.out <director_intrare> <director_iesire>\n");
+    if (argc != 4 || strlen(argv[3]) != 1) {
+        printf("Usage ./a.out <director_intrare> <director_iesire> <alfanumeric character>\n");
         exit(1);
     }
 
@@ -409,7 +454,7 @@ int main(int argc, char **argv) {
     struct stat fileStat;
     myStat statistic;
 
-    parseDir(dir, dirent, argv[1], argv[2], &fileStat, &statistic);
+    parseDir(dir, dirent, argv[1], argv[2], argv[3], &fileStat, &statistic);
 
     closedir(dir);
 
